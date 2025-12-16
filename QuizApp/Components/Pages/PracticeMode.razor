@@ -1,0 +1,189 @@
+﻿@page "/practice-mode"
+@using QuizApp.Services
+@using QuizApp.Components
+@inject QuestionService QuestionService
+@rendermode InteractiveServer
+
+<div class="container mt-4">
+    @if (isPlaying) {
+        <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="StopPlaying">⬅ Quit Practice</button>
+        </div>
+        <QuizRunner Questions="loadedQuestions" />
+    }
+    else {
+        <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Practice by Tag</h4>
+            </div>
+
+            <div class="card-body">
+
+                @* Manual tag input *@
+                <div class="input-group mb-3">
+                    <input class="form-control" @bind="manualTagInput" placeholder="Type a tag..." @onkeyup="HandleEnterKey" />
+                    <button class="btn btn-outline-secondary" @onclick="AddManualTag">Add</button>
+                </div>
+
+                @* Selected tags area *@
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Selected Tags:</label>
+                    <div class="p-3 border rounded bg-light min-h-50">
+                        @if (!selectedTags.Any()) {
+                            <span class="text-muted small">No tags selected...</span>
+                        }
+                        @foreach (var tag in selectedTags) {
+                            <span class="badge bg-primary me-1 fs-6 mb-1">
+                                @tag
+                                <span style="cursor:pointer; margin-left:8px;" @onclick="() => RemoveTag(tag)">×</span>
+                            </span>
+                        }
+                    </div>
+                </div>
+                @* Suggested tags *@
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-end mb-2">
+                        <label class="form-label fw-bold text-muted mb-0">Suggestions</label>
+                        @* NEW: Shuffle Button *@
+                        <button class="btn btn-sm btn-link text-decoration-none" @onclick="ShuffleSuggestions">
+                            🔄 Refresh Tags
+                        </button>
+                    </div>
+
+                    <div class="p-2 bg-light rounded">
+                        @if (suggestions.Any()) {
+                            @foreach (var tag in suggestions) {
+                                <button class="btn btn-outline-secondary btn-sm me-1 mb-1"
+                                        @onclick="() => PickSuggestion(tag)">
+                                    + @tag
+                                </button>
+                            }
+                        }
+                        else {
+                            <span class="text-muted small">No more tags available...</span>
+                        }
+                    </div>
+                </div>
+
+                @* 4. Settings *@
+                <div class="mb-4">
+                    <label class="form-label">Number of Questions</label>
+                    <input type="number" class="form-control" @bind="questionCount" min="1" max="50" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage)) {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <button class="btn btn-success w-100 btn-lg" @onclick="StartPractice">
+                    Start Quiz
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isPlaying = false;
+    private int questionCount = 5;
+    private string errorMessage = "";
+    private string manualTagInput = "";
+
+    // Collections
+    private List<string> allAvailableTags = new List<string>();
+    private List<string> suggestions = new List<string>();
+    private List<string> selectedTags = new List<string>();
+
+    private List<Question> loadedQuestions;
+
+    protected override async Task OnInitializedAsync () {
+        allAvailableTags = await QuestionService.GetTopTagsAsync();
+        RefillSuggestions();
+    }
+
+    private void RefillSuggestions () {
+        int maxSuggestions = 15;
+
+        // calc how many slots we have open
+        var slotsOpen = maxSuggestions - suggestions.Count;
+        if (slotsOpen <= 0) return;
+
+        // All tags MINUS (selected + already suggested)
+        var pool = allAvailableTags
+            .Except(selectedTags)
+            .Except(suggestions)
+            .ToList();
+
+        if (pool.Any()) {
+            var rnd = new Random();
+            var newPicks = pool.OrderBy(x => rnd.Next()).Take(slotsOpen).ToList();
+            suggestions.AddRange(newPicks);
+        }
+    }
+
+    private void ShuffleSuggestions () {
+        // Clear current suggestions so its forced to pick new ones from the pool
+        suggestions.Clear();
+        RefillSuggestions();
+    }
+
+    private void PickSuggestion (string tag) {
+        if (!selectedTags.Contains(tag)) {
+            selectedTags.Add(tag);
+            suggestions.Remove(tag); // Remove from ui
+            RefillSuggestions();
+        }
+    }
+
+    private void RemoveTag (string tag) {
+        selectedTags.Remove(tag);
+
+        if (!suggestions.Contains(tag)) {
+            suggestions.Insert(0, tag);
+        }
+
+        if (suggestions.Count > 15) {
+            suggestions.RemoveAt(suggestions.Count - 1);
+        }
+    }
+
+    private void AddManualTag () {
+        if (!string.IsNullOrWhiteSpace(manualTagInput) && !selectedTags.Contains(manualTagInput)) {
+            selectedTags.Add(manualTagInput);
+
+            // Clean up UI if it was visible
+            if (suggestions.Contains(manualTagInput)) {
+                suggestions.Remove(manualTagInput);
+                RefillSuggestions();
+            }
+            manualTagInput = "";
+        }
+    }
+
+    private void HandleEnterKey (KeyboardEventArgs e) {
+        if (e.Key == "Enter") AddManualTag();
+    }
+
+
+    private async Task StartPractice () {
+        if (!selectedTags.Any()) {
+            errorMessage = "Please select at least one tag.";
+            return;
+        }
+
+        loadedQuestions = await QuestionService.GetRandomQuestionsByTagsAsync(selectedTags, questionCount);
+
+        if (loadedQuestions == null || !loadedQuestions.Any()) {
+            errorMessage = "No questions found matching these tags.";
+            return;
+        }
+
+        errorMessage = "";
+        isPlaying = true;
+    }
+
+    private void StopPlaying () {
+        isPlaying = false;
+        loadedQuestions = null;
+    }
+}

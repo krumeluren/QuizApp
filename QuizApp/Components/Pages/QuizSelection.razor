@@ -1,0 +1,44 @@
+﻿@page "/quiz-selection"
+@using QuizApp.Services
+@inject QuizService QuizService
+@rendermode InteractiveServer
+
+<div class="container">
+    <h2 class="mb-4 text-center">Select a Quiz to Play</h2>
+
+    @if (quizzes == null) {
+        <p class="text-center">Loading...</p>
+    }
+    else {
+        <div class="row justify-content-center">
+            @foreach (var quiz in quizzes) {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow border-0 hover-effect">
+                        <div class="card-body text-center">
+                            <h3 class="card-title text-primary">@quiz.Title</h3>
+                            <p class="text-muted">@quiz.QuestionIds.Count Questions</p>
+
+                            <div class="mb-4">
+                                @foreach (var tag in quiz.Tags.Take(3)) {
+                                    <span class="badge rounded-pill bg-light text-dark border me-1">@tag</span>
+                                }
+                            </div>
+
+                            <a href="/play-quiz/@quiz.Id" class="btn btn-primary btn-lg w-100 rounded-pill">
+                                ▶ Play Now
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Quiz> quizzes;
+
+    protected override async Task OnInitializedAsync () {
+        quizzes = await QuizService.GetAllQuizzesAsync();
+    }
+}

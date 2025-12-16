@@ -1,0 +1,129 @@
+﻿@rendermode InteractiveServer
+
+<div class="card shadow-sm" style="max-width: 600px; margin: 0 auto;">
+
+    @if (IsFinished) {
+        // results 
+        <div class="card-body text-center p-5">
+            <h1 class="display-1">🏆</h1>
+            <h2 class="mb-4">Quiz Finished!</h2>
+
+            <h3 class="text-primary mb-3">Score: @Score / @Questions.Count</h3>
+
+            <div class="progress mb-4" style="height: 30px;">
+                <div class="progress-bar bg-success" role="progressbar"
+                     style="width: @(GetScorePercentage())%;"
+                     aria-valuenow="@Score" aria-valuemin="0" aria-valuemax="@Questions.Count">
+                    @(GetScorePercentage())%
+                </div>
+            </div>
+
+            <a href="/" class="btn btn-outline-primary">Return Home</a>
+        </div>
+    }
+    else {
+        // gameplay
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="badge bg-secondary">Question @(currentQuestionIndex + 1) of @Questions.Count</span>
+            <span class="text-muted small">Score: @Score</span>
+        </div>
+
+        <div class="card-body p-4">
+            <h4 class="card-title mb-4">@CurrentQuestion.Text</h4>
+
+            <div class="d-grid gap-2">
+                @foreach (var answer in CurrentQuestion.Answers) {
+                    <button class="btn btn-lg @GetButtonClass(answer)"
+                            @onclick="() => HandleAnswer(answer)"
+                            disabled="@hasAnswered">
+                        @answer.Text
+                    </button>
+                }
+            </div>
+
+            @if (hasAnswered) {
+                <div class="mt-4 text-center">
+                    @if (lastAnswerWasCorrect) {
+                        <div class="alert alert-success">Correct! 🎉</div>
+                    }
+                    else {
+                        <div class="alert alert-danger">Wrong! The correct answer was: <strong>@GetCorrectAnswerText()</strong></div>
+                    }
+
+                    <button class="btn btn-primary btn-lg" @onclick="NextQuestion">
+                        Next Question ➡
+                    </button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<Question> Questions { get; set; }
+
+    private List<Question> shuffledQuestions;
+
+    private int currentQuestionIndex = 0;
+    private int Score = 0;
+    private bool IsFinished = false;
+
+    private bool hasAnswered = false;
+    private bool lastAnswerWasCorrect = false;
+    private Answer selectedAnswer;
+
+
+    private Question CurrentQuestion => shuffledQuestions[currentQuestionIndex];
+
+    protected override void OnInitialized () {
+        shuffledQuestions = new List<Question>(Questions);
+        var rnd = new Random();
+        shuffledQuestions = shuffledQuestions.OrderBy(x => rnd.Next()).ToList();
+        foreach (var q in shuffledQuestions) {
+            q.Answers = q.Answers.OrderBy(a => rnd.Next()).ToList();
+        }
+    }
+
+    private void HandleAnswer (Answer answer) {
+        if (hasAnswered) return;
+
+        selectedAnswer = answer;
+        hasAnswered = true;
+
+        if (answer.IsCorrect) {
+            Score++;
+            lastAnswerWasCorrect = true;
+        }
+        else {
+            lastAnswerWasCorrect = false;
+        }
+    }
+
+    private void NextQuestion () {
+        if (currentQuestionIndex < shuffledQuestions.Count - 1) {
+            currentQuestionIndex++;
+            hasAnswered = false;
+            selectedAnswer = null;
+        }
+        else {
+            IsFinished = true;
+        }
+    }
+
+    // button styling (green/red)
+    private string GetButtonClass (Answer answer) {
+        if (!hasAnswered) return "btn-outline-dark"; // default 
+
+        if (answer.IsCorrect) return "btn-success"; // show green for correct answer
+
+        if (selectedAnswer == answer && !answer.IsCorrect) return "btn-danger"; // Show red if you click wrong
+
+        return "btn-outline-secondary"; // Fade out other options
+    }
+
+    private string GetCorrectAnswerText () {
+        return CurrentQuestion.Answers.FirstOrDefault(a => a.IsCorrect)?.Text ?? "Unknown";
+    }
+
+    private int GetScorePercentage () => (int)((double)Score / Questions.Count * 100);
+}

@@ -1,0 +1,39 @@
+﻿@page "/play-quiz/{QuizId}"
+@using QuizApp.Services
+@using QuizApp.Components
+@inject QuizService QuizService
+@rendermode InteractiveServer
+
+<div class="container mt-4">
+    @if (isLoading) {
+        <div class="text-center"><div class="spinner-border"></div></div>
+    }
+    else if (questions == null || !questions.Any()) {
+        <div class="alert alert-warning">This quiz has no questions!</div>
+    }
+    else {
+        <div class="text-center mb-4">
+            <h2>@quizTitle</h2>
+        </div>
+
+        @* THE GAME ENGINE *@
+        <QuizRunner Questions="questions" />
+    }
+</div>
+
+@code {
+    [Parameter] public string QuizId { get; set; }
+
+    private List<Question> questions;
+    private string quizTitle;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync () {
+        var result = await QuizService.GetQuizWithQuestionsAsync(QuizId);
+        if (result != null) {
+            quizTitle = result.Quiz.Title;
+            questions = result.Questions;
+        }
+        isLoading = false;
+    }
+}

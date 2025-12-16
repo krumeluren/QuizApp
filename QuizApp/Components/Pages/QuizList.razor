@@ -1,0 +1,56 @@
+﻿@page "/quiz-list"
+@using QuizApp.Services
+@inject QuizService QuizService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>My Quizzes</h2>
+        <a href="/quiz-editor" class="btn btn-primary">+ Create New Quiz</a>
+    </div>
+
+    @if (quizzes == null) {
+        <p>Loading...</p>
+    }
+    else if (!quizzes.Any()) {
+        <div class="alert alert-info">No quizzes found. Create one!</div>
+    }
+    else {
+        <div class="row">
+            @foreach (var quiz in quizzes) {
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">@quiz.Title</h5>
+                            <p class="card-text text-muted">
+                                @quiz.QuestionIds.Count questions
+                            </p>
+                            <div class="mb-3">
+                                @foreach (var tag in quiz.Tags.Take(3)) {
+                                    <span class="badge bg-secondary me-1">@tag</span>
+                                }
+                                @if (quiz.Tags.Count > 3) {
+                                    <small>+@(quiz.Tags.Count - 3) more</small>
+                                }
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-top-0">
+                            <a href="/quiz-editor/@quiz.Id" class="btn btn-outline-primary w-100">
+                                ✏️ Edit Quiz
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Quiz> quizzes;
+
+    protected override async Task OnInitializedAsync () {
+        quizzes = await QuizService.GetAllQuizzesAsync();
+    }
+}

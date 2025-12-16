@@ -1,0 +1,223 @@
+﻿@page "/quiz-editor"
+@page "/quiz-editor/{QuizId}"
+@* ^^^ Support both routes *@
+
+@using MongoDB.Bson.Serialization.Attributes
+@using QuizApp.Services
+@inject QuizService QuizService
+@inject NavigationManager Navigation
+
+<div class="container pb-5">
+    @if (isLoading) {
+        <div class="d-flex justify-content-center mt-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else {
+    }
+</div>
+
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Quiz Editor</h2>
+        <button class="btn btn-success btn-lg" @onclick="SaveWholeQuiz">
+            💾 Save Quiz
+        </button>
+    </div>
+
+    @* GLOBAL SETTINGS *@
+    <div class="card mb-4 shadow-sm border-primary">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Quiz Settings</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Quiz Title</label>
+                <input class="form-control form-control-lg" @bind="quiz.Title" placeholder="Enter quiz title..." />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Global Tags</label>
+                <span class="text-muted small ms-2">(Applied to all questions automatically)</span>
+
+                <div class="input-group mb-2">
+                    <input class="form-control" @bind="newGlobalTag" placeholder="e.g. Science" />
+                    <button class="btn btn-outline-primary" @onclick="AddGlobalTag">Add Tag</button>
+                </div>
+                <div>
+                    @foreach (var tag in quiz.Tags) {
+                        <span class="badge bg-secondary me-1">
+                            @tag <span style="cursor:pointer; margin-left:5px" @onclick="() => RemoveGlobalTag(tag)">×</span>
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @*  QUESTIONS *@
+    
+    <h4 class="mb-3">Questions (@questions.Count)</h4>
+
+    @foreach (var (q, index) in questions.Select((x, i) => (x, i))) {
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Question #@(index + 1)</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveQuestion(q)">Remove Question</button>
+            </div>
+
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Question Text</label>
+                    <input class="form-control" @bind="q.Text" placeholder="Question text..." />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tags</label>
+
+                    <div class="input-group mb-2 input-group-sm" style="max-width: 300px;">
+                        <input class="form-control" @bind="q.TempTagInput" placeholder="Add specific tag..." />
+                        <button class="btn btn-outline-secondary" @onclick="() => AddLocalTag(q)">Add</button>
+                    </div>
+
+                    <div class="p-2 border rounded bg-light d-flex flex-wrap gap-1">
+
+                        @* Global tags *@
+                        @foreach (var gTag in quiz.Tags) {
+                            <span class="badge bg-secondary text-white border border-secondary" title="Inherited from Quiz">
+                                @gTag
+                            </span>
+                        }
+
+                        @* local tags*@
+                        @foreach (var lTag in q.Tags) {
+                            // Avoid duplicates if a local tag match a global tag
+                            if (!quiz.Tags.Contains(lTag)) {
+                                <span class="badge bg-primary">
+                                    @lTag
+                                    <span style="cursor:pointer; margin-left:5px" @onclick="() => q.Tags.Remove(lTag)">×</span>
+                                </span>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <label class="form-label">Answers</label>
+                @foreach (var answer in q.Answers) {
+                    <div class="input-group mb-2">
+                        <div class="input-group-text">
+                            <input class="form-check-input mt-0" type="checkbox" @bind="answer.IsCorrect" />
+                        </div>
+                        <input class="form-control" @bind="answer.Text" placeholder="Answer..." />
+
+                        @if (q.Answers.Count > 3) {
+                            <button class="btn btn-outline-danger" @onclick="() => q.Answers.Remove(answer)">×</button>
+                        }
+                    </div>
+                }
+                <button class="btn btn-sm btn-light border" @onclick="() => q.Answers.Add(new Answer())">+ Add Answer</button>
+            </div>
+        </div>
+    }
+
+    <div class="d-grid gap-2">
+        <button class="btn btn-outline-primary btn-lg border-2 border-dashed" @onclick="AddNewQuestion">
+            + Add New Question
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string QuizId { get; set; } // The ID from the url (if editing)
+
+    public class QuestionViewModel : Question {
+        [BsonIgnore] // prevent this from being saved to DB
+        public string TempTagInput { get; set; } = "";
+    }
+
+    private Quiz quiz = new Quiz();
+    private List<QuestionViewModel> questions = new List<QuestionViewModel>();
+    private string newGlobalTag = "";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync () {
+        if (string.IsNullOrEmpty(QuizId)) {
+            // CREATE MODE
+            quiz = new Quiz();
+            AddNewQuestion(); // add 1 empty question
+            isLoading = false;
+        }
+        else {
+            // EDIT MODE
+            var data = await QuizService.GetQuizWithQuestionsAsync(QuizId);
+
+            if (data != null) {
+                quiz = data.Quiz;
+
+                // DB question objects to view models
+                questions = data.Questions.Select(q => new QuestionViewModel {
+                    Id = q.Id,
+                    Text = q.Text,
+                    Tags = q.Tags,
+                    Answers = q.Answers,
+                    TempTagInput = ""
+                }).ToList();
+            }
+            isLoading = false;
+        }
+    }
+
+    private void AddGlobalTag () {
+        if (!string.IsNullOrWhiteSpace(newGlobalTag) && !quiz.Tags.Contains(newGlobalTag)) {
+            quiz.Tags.Add(newGlobalTag);
+            newGlobalTag = "";
+        }
+    }
+
+    private void RemoveGlobalTag (string tag) => quiz.Tags.Remove(tag);
+
+    private void AddLocalTag (QuestionViewModel q) {
+        if (!string.IsNullOrWhiteSpace(q.TempTagInput) && !q.Tags.Contains(q.TempTagInput)) {
+            q.Tags.Add(q.TempTagInput);
+            q.TempTagInput = "";
+        }
+    }
+
+    private void AddNewQuestion () {
+        var newQ = new QuestionViewModel();
+        newQ.Answers.Add(new Answer());
+        newQ.Answers.Add(new Answer());
+        newQ.Answers.Add(new Answer());
+
+        questions.Add(newQ);
+    }
+
+    private void RemoveQuestion (QuestionViewModel q) {
+        if (questions.Count > 1) questions.Remove(q);
+    }
+
+    private async Task SaveWholeQuiz () {
+        if (string.IsNullOrWhiteSpace(quiz.Title)) return;
+
+        var questionsToSave = new List<Question>();
+
+        foreach (var vm in questions) {
+            // merge global tags into local tags (avoiding duplicates)
+            foreach (var gTag in quiz.Tags) {
+                if (!vm.Tags.Contains(gTag)) {
+                    vm.Tags.Add(gTag);
+                }
+            }
+            // map back to base Question to save
+            questionsToSave.Add(vm);
+        }
+
+        await QuizService.SaveQuizTransactionAsync(quiz, questionsToSave);
+
+        // Return to list after save
+        Navigation.NavigateTo("/quiz-list");
+    }
+}

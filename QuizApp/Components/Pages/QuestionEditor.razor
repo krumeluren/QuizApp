@@ -1,0 +1,104 @@
+﻿@page "/questions-list"
+@using QuizApp.Services
+@inject QuestionService QuestionService;
+@rendermode InteractiveServer
+
+@inject NavigationManager Navigation
+
+<h3>Create New Question</h3>
+
+<EditForm Model="@Question" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Question Text</label>
+        <InputText class="form-control" @bind-Value="Question.Text" placeholder="e.g., What is the capital of France?" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tags (for random quiz generation)</label>
+        <div class="input-group mb-2">
+            <input class="form-control" @bind="newTag" placeholder="e.g., Geography" />
+            <button type="button" class="btn btn-outline-secondary" @onclick="AddTag">Add Tag</button>
+        </div>
+
+        <div>
+            @foreach (var tag in Question.Tags) {
+                <span class="badge bg-primary me-1">
+                    @tag
+                    <span style="cursor:pointer; margin-left:5px;" @onclick="() => RemoveTag(tag)">x</span>
+                </span>
+            }
+        </div>
+    </div>
+
+    <hr />
+
+    <h4>Answers</h4>
+    @foreach (var answer in Question.Answers) {
+        <div class="input-group mb-2">
+            <div class="input-group-text">
+                <input class="form-check-input mt-0" type="checkbox" @bind="answer.IsCorrect" aria-label="Is correct" />
+            </div>
+
+            <InputText class="form-control" @bind-Value="answer.Text" placeholder="Answer text" />
+
+            <button type="button" class="btn btn-danger" @onclick="() => RemoveAnswer(answer)">Remove</button>
+        </div>
+    }
+
+    <button type="button" class="btn btn-secondary mb-3" @onclick="AddAnswer">Add Answer Option</button>
+
+    <hr />
+
+    <button type="submit" class="btn btn-success">Save Question</button>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    public Question Question { get; set; }
+    // temp storage for the tag input field
+    private string newTag = string.Empty;
+
+    protected override void OnInitialized () {
+        // init 3 empty answers 
+        if (Question is null) {
+            Question = new Question();
+            Question.Answers.Add(new Answer());
+            Question.Answers.Add(new Answer());
+            Question.Answers.Add(new Answer());
+        }
+    }
+
+    private void AddTag () {
+        if (!string.IsNullOrWhiteSpace(newTag) && !Question.Tags.Contains(newTag)) {
+            Question.Tags.Add(newTag);
+            newTag = string.Empty; // Clear input
+        }
+    }
+
+    private void RemoveTag (string tag) {
+        Question.Tags.Remove(tag);
+    }
+
+    private void AddAnswer () {
+        Question.Answers.Add(new Answer());
+    }
+
+    private void RemoveAnswer (Answer answer) {
+        if (Question.Answers.Count > 3){
+            Question.Answers.Remove(answer);
+        }
+    }
+
+    private async Task HandleValidSubmit () {
+        if (Question.Answers.Count < 3) {
+            return;
+        }
+
+        await QuestionService.CreateAsync(Question);
+
+        Navigation.NavigateTo("/quiz-list");
+    }
+}

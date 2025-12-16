@@ -9,10 +9,20 @@ namespace QuizApp.Services {
             _quizzes = db.GetCollection<Quiz>("quizzes");
         }
 
+        public async Task<List<Quiz>> GetAllQuizzesAsync () {
+            // Return all quizzes, sorted by newest first
+            return await _quizzes.Find(_ => true)
+                                 .SortByDescending(q => q.Id)
+                                 .ToListAsync();
+        }
+
         public async Task<QuizWithQuestions> GetQuizWithQuestionsAsync (string quizId) {
+            // 1. Fetch the Quiz
             var quiz = await _quizzes.Find(q => q.Id == quizId).FirstOrDefaultAsync();
             if (quiz == null) return null;
 
+            // 2. Fetch the Questions associated with this Quiz
+            // We filter questions where the Id is in the quiz's ID list
             var filter = Builders<Question>.Filter.In(q => q.Id, quiz.QuestionIds);
             var questions = await _questions.Find(filter).ToListAsync();
 
@@ -20,6 +30,18 @@ namespace QuizApp.Services {
                 Quiz = quiz,
                 Questions = questions
             };
+        }
+
+        public async Task SaveQuizTransactionAsync (Quiz quiz, List<Question> questions) {
+            foreach (var q in questions) {
+                var filter = Builders<Question>.Filter.Eq(x => x.Id, q.Id);
+                await _questions.ReplaceOneAsync(filter, q, new ReplaceOptions { IsUpsert = true });
+            }
+
+            quiz.QuestionIds = questions.Select(q => q.Id).ToList();
+
+            var quizFilter = Builders<Quiz>.Filter.Eq(x => x.Id, quiz.Id);
+            await _quizzes.ReplaceOneAsync(quizFilter, quiz, new ReplaceOptions { IsUpsert = true });
         }
     }
 
