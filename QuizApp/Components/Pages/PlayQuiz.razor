@@ -12,17 +12,37 @@
         <div class="alert alert-warning">This quiz has no questions!</div>
     }
     else {
-        <div class="text-center mb-4">
-            <h2>@quizTitle</h2>
-        </div>
+        @if (!hasStarted) {
+            @* --- LOBBY SCREEN --- *@
+            <div class="card shadow-sm mx-auto text-center p-5" style="max-width: 600px;">
+                <h1 class="mb-3">@quizTitle</h1>
+                <p class="text-muted mb-4">@questions.Count Questions</p>
 
-        @* THE GAME ENGINE *@
-        <QuizRunner Questions="questions" />
+                <div class="form-check form-switch d-inline-block text-start bg-light p-3 rounded mb-4">
+                    <input class="form-check-input" type="checkbox" id="feedbackToggle" @bind="showFeedback">
+                    <label class="form-check-label ms-2" for="feedbackToggle">
+                        <strong>Show Instant Feedback?</strong><br />
+                    </label>
+                </div>
+
+                <div>
+                    <button class="btn btn-primary btn-lg w-50" @onclick="() => hasStarted = true">
+                        Start Quiz ▶
+                    </button>
+                </div>
+            </div>
+        }
+        else {
+            <QuizRunner Questions="questions" ShowInstantFeedback="showFeedback" />
+        }
     }
 </div>
 
 @code {
     [Parameter] public string QuizId { get; set; }
+
+    private bool showFeedback = true;
+    private bool hasStarted = false;
 
     private List<Question> questions;
     private string quizTitle;

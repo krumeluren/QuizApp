@@ -9,7 +9,7 @@
         <div class="mb-3">
             <button class="btn btn-sm btn-outline-secondary" @onclick="StopPlaying">⬅ Quit Practice</button>
         </div>
-        <QuizRunner Questions="loadedQuestions" />
+        <QuizRunner Questions="loadedQuestions" ShowInstantFeedback="practiceShowFeedback" />
     }
     else {
         <div class="card shadow-sm mx-auto" style="max-width: 600px;">
@@ -65,10 +65,15 @@
                     </div>
                 </div>
 
-                @* 4. Settings *@
+                @* Settings *@
                 <div class="mb-4">
                     <label class="form-label">Number of Questions</label>
-                    <input type="number" class="form-control" @bind="questionCount" min="1" max="50" />
+                    <input type="number" class="form-control mb-3" @bind="questionCount" min="1" max="50" />
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="practiceFeedback" @bind="practiceShowFeedback">
+                        <label class="form-check-label" for="practiceFeedback">Show Instant Feedback?</label>
+                    </div>
                 </div>
 
                 @if (!string.IsNullOrEmpty(errorMessage)) {
@@ -84,12 +89,13 @@
 </div>
 
 @code {
+
+    private bool practiceShowFeedback = true;
     private bool isPlaying = false;
     private int questionCount = 5;
     private string errorMessage = "";
     private string manualTagInput = "";
 
-    // Collections
     private List<string> allAvailableTags = new List<string>();
     private List<string> suggestions = new List<string>();
     private List<string> selectedTags = new List<string>();

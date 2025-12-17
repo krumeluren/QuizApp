@@ -25,7 +25,9 @@
         // gameplay
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <span class="badge bg-secondary">Question @(currentQuestionIndex + 1) of @Questions.Count</span>
-            <span class="text-muted small">Score: @Score</span>
+            @if (ShowInstantFeedback) {
+                <span class="text-muted small">Score: @Score</span>
+            }
         </div>
 
         <div class="card-body p-4">
@@ -43,11 +45,13 @@
 
             @if (hasAnswered) {
                 <div class="mt-4 text-center">
-                    @if (lastAnswerWasCorrect) {
-                        <div class="alert alert-success">Correct! 🎉</div>
-                    }
-                    else {
-                        <div class="alert alert-danger">Wrong! The correct answer was: <strong>@GetCorrectAnswerText()</strong></div>
+                    @if (ShowInstantFeedback) {
+                        @if (lastAnswerWasCorrect) {
+                            <div class="alert alert-success">Correct! 🎉</div>
+                        }
+                        else {
+                            <div class="alert alert-danger">Wrong! Correct: <strong>@GetCorrectAnswerText()</strong></div>
+                        }
                     }
 
                     <button class="btn btn-primary btn-lg" @onclick="NextQuestion">
@@ -61,6 +65,8 @@
 
 @code {
     [Parameter] public List<Question> Questions { get; set; }
+
+    [Parameter] public bool ShowInstantFeedback { get; set; } = true;
 
     private List<Question> shuffledQuestions;
 
@@ -110,20 +116,22 @@
         }
     }
 
-    // button styling (green/red)
     private string GetButtonClass (Answer answer) {
-        if (!hasAnswered) return "btn-outline-dark"; // default 
+        if (!hasAnswered) return "btn-outline-dark";
 
-        if (answer.IsCorrect) return "btn-success"; // show green for correct answer
+        // If feedback is OFF
+        if (!ShowInstantFeedback) {
+            // highlight the clicked in blue
+            if (selectedAnswer == answer) return "btn-primary";
+            return "btn-outline-secondary";
+        }
 
-        if (selectedAnswer == answer && !answer.IsCorrect) return "btn-danger"; // Show red if you click wrong
-
-        return "btn-outline-secondary"; // Fade out other options
+        // standard feedback (red/green)
+        if (answer.IsCorrect) return "btn-success";
+        if (selectedAnswer == answer && !answer.IsCorrect) return "btn-danger";
+        return "btn-outline-secondary";
     }
 
-    private string GetCorrectAnswerText () {
-        return CurrentQuestion.Answers.FirstOrDefault(a => a.IsCorrect)?.Text ?? "Unknown";
-    }
-
-    private int GetScorePercentage () => (int)((double)Score / Questions.Count * 100);
+    private string GetCorrectAnswerText () => CurrentQuestion.Answers.FirstOrDefault(a => a.IsCorrect)?.Text ?? "Unknown";
+    private int GetScorePercentage () => (int)((double)Score / shuffledQuestions.Count * 100);
 }
