@@ -10,19 +10,16 @@ namespace QuizApp.Services {
         }
 
         public async Task<List<Quiz>> GetAllQuizzesAsync () {
-            // Return all quizzes, sorted by newest first
+            // sorted by newest first
             return await _quizzes.Find(_ => true)
                                  .SortByDescending(q => q.Id)
                                  .ToListAsync();
         }
 
         public async Task<QuizWithQuestions> GetQuizWithQuestionsAsync (string quizId) {
-            // 1. Fetch the Quiz
             var quiz = await _quizzes.Find(q => q.Id == quizId).FirstOrDefaultAsync();
             if (quiz == null) return null;
 
-            // 2. Fetch the Questions associated with this Quiz
-            // We filter questions where the Id is in the quiz's ID list
             var filter = Builders<Question>.Filter.In(q => q.Id, quiz.QuestionIds);
             var questions = await _questions.Find(filter).ToListAsync();
 
